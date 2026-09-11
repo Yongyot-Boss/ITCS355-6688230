@@ -18,6 +18,7 @@ FROM python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41
 # Non-root. A training container has no reason to run as root, and graders check.
 RUN useradd --create-home --uid 10001 runner
 RUN mkdir -p /app/data /app/mlruns && chown runner:runner /app/data /app/mlruns
+RUN chmod a+rwx /app/data /app/mlruns
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app

@@ -44,6 +44,7 @@ image-push: image ## Push to CONTAINER_REGISTRY via your adapter
 reproduce: image ## THE ONE COMMAND. Grader runs this.
 	docker run --rm \
 	  -v "$$PWD/reports:/app/reports" \
+	  --user "$$(id -u):$$(id -g)" \
 	  -e MLFLOW_TRACKING_URI=sqlite:////app/reports/mlflow.db \
 	  --entrypoint /bin/sh \
 	  $(IMAGE):$(TAG) -c "python scripts/make_dataset.py --seed $(SEED) && \
