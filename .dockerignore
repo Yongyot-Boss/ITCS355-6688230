@@ -1,6 +1,8 @@
 .git
 .dvc/cache
 data/
+!data/
+!data/raw.dvc
 mlruns/
 mlartifacts/
 mlflow.db

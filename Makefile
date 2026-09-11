@@ -35,18 +35,19 @@ train: ## Train locally, outside the container
 	python -m src.train --seed $(SEED) --metrics-out reports/metrics.json
 
 image: ## Build the training image for linux/amd64
-	docker buildx build --platform $(PLATFORM) -t $(IMAGE):$(TAG) --load .
+	docker buildx build --platform $(PLATFORM) --build-arg GIT_COMMIT=$$(git rev-parse HEAD 2>/dev/null || echo unknown) -t $(IMAGE):$(TAG) --load .
 
 image-push: image ## Push to CONTAINER_REGISTRY via your adapter
 	python -c "from src import config; from cloudlayer.factory import get_adapter; \
 	print(get_adapter(config.load()).push_image(\"$(IMAGE):$(TAG)\"))"
 
-reproduce: data image ## THE ONE COMMAND. Grader runs this.
+reproduce: image ## THE ONE COMMAND. Grader runs this.
 	docker run --rm \
-	  -v "$$PWD/data:/app/data:ro" \
 	  -v "$$PWD/reports:/app/reports" \
 	  -e MLFLOW_TRACKING_URI=sqlite:////app/reports/mlflow.db \
-	  $(IMAGE):$(TAG) --seed $(SEED) --metrics-out /app/reports/metrics.json
+	  --entrypoint /bin/sh \
+	  $(IMAGE):$(TAG) -c "python scripts/make_dataset.py --seed $(SEED) && \
+	  python -m src.train --seed $(SEED) --metrics-out /app/reports/metrics.json"
 
 verify: ## Check the produced metric against the README claim
 	python scripts/verify_metric.py

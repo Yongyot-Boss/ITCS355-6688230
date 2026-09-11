@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 from pathlib import Path
 
 import mlflow
 import mlflow.sklearn
+import yaml
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import average_precision_score, roc_auc_score
 
@@ -23,6 +25,9 @@ from src import config, data, seeds
 
 
 def git_commit() -> str:
+    configured = os.environ.get("GIT_COMMIT")
+    if configured:
+        return configured
     try:
         out = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -31,6 +36,14 @@ def git_commit() -> str:
         return out.stdout.strip()
     except Exception:
         return "unknown"
+
+
+def dvc_hash() -> str:
+    for path in (config.REPO_ROOT / "raw.dvc", config.REPO_ROOT / "data" / "raw.dvc"):
+        if path.exists():
+            document = yaml.safe_load(path.read_text())
+            return str(document["outs"][0]["md5"])
+    raise FileNotFoundError("DVC pointer not found: expected raw.dvc or data/raw.dvc")
 
 
 def parse_args() -> argparse.Namespace:
@@ -53,6 +66,8 @@ def main() -> None:
 
     df = data.load_raw(cfg.raw_path)
     fingerprint = data.data_fingerprint(cfg.raw_path)
+    data_version = dvc_hash()
+    commit = git_commit()
     train_df, val_df, test_df = data.split(df, seed=seed)
 
     mlflow.set_tracking_uri(cfg.mlflow_tracking_uri)
@@ -65,10 +80,12 @@ def main() -> None:
             "min_samples_leaf": args.min_samples_leaf,
             "seed": seed,
             "n_features": len(data.FEATURES),
+            "dvc_hash": data_version,
         })
         # Provenance. This is what makes the metric traceable.
         mlflow.set_tags({
-            "git_commit": git_commit(),
+            "git_commit": commit,
+            "dvc_hash": data_version,
             "data_fingerprint": fingerprint,
             "split_strategy": "group_by_machine_id",
             "n_train_rows": len(train_df),
@@ -93,11 +110,23 @@ def main() -> None:
         mlflow.log_metrics(metrics)
         mlflow.sklearn.log_model(model, name="model")
 
-        print(json.dumps({"seed": seed, "data_fingerprint": fingerprint, **metrics}, indent=2))
+        print(json.dumps({
+            "seed": seed,
+            "dvc_hash": data_version,
+            "git_commit": commit,
+            "data_fingerprint": fingerprint,
+            **metrics,
+        }, indent=2))
         if args.metrics_out:
             args.metrics_out.parent.mkdir(parents=True, exist_ok=True)
             args.metrics_out.write_text(json.dumps(
-                {"seed": seed, "data_fingerprint": fingerprint, **metrics}, indent=2))
+                {
+                    "seed": seed,
+                    "dvc_hash": data_version,
+                    "git_commit": commit,
+                    "data_fingerprint": fingerprint,
+                    **metrics,
+                }, indent=2))
 
 
 if __name__ == "__main__":

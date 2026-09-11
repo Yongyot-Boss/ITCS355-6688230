@@ -15,7 +15,8 @@ Hints for Lab 1:
 """
 from __future__ import annotations
 
-from typing import Any
+import json
+import subprocess
 
 from cloudlayer.base import CloudAdapter
 
@@ -28,7 +29,39 @@ class GcpAdapter(CloudAdapter):
         raise NotImplementedError("TODO Lab 1: blob.download_to_filename, creating parents")
 
     def push_image(self, local_tag: str) -> str:
-        raise NotImplementedError("TODO Lab 1: configure-docker, push, return repo@sha256:...")
+        registry = self.cfg.container_registry.rstrip("/")
+        if not registry:
+            raise ValueError("CONTAINER_REGISTRY must be set for GCP image pushes")
+
+        registry_host = f"{self.cfg.region}-docker.pkg.dev"
+        if not registry.startswith(registry_host + "/"):
+            raise ValueError(
+                "CONTAINER_REGISTRY must start with "
+                f"{registry_host}/ for the configured REGION"
+            )
+
+        image_name = local_tag.rsplit("/", 1)[-1]
+        remote_tag = f"{registry}/{image_name}"
+
+        subprocess.run(
+            ["gcloud", "auth", "configure-docker", registry_host, "--quiet"],
+            check=True,
+        )
+        subprocess.run(["docker", "tag", local_tag, remote_tag], check=True)
+        subprocess.run(["docker", "push", remote_tag], check=True)
+
+        inspection = subprocess.run(
+            ["docker", "image", "inspect", remote_tag, "--format", "{{json .RepoDigests}}"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        digests = json.loads(inspection.stdout)
+        remote_repository = remote_tag.rsplit(":", 1)[0]
+        for digest in digests:
+            if digest.startswith(remote_repository + "@sha256:"):
+                return digest
+        raise RuntimeError(f"No pushed digest found for {remote_tag}")
 
     # submit_training / register_model  -> Lab 2 (Vertex custom training + Model Registry)
     # deploy / invoke                   -> Lab 3 (Vertex Endpoint)
