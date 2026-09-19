@@ -22,6 +22,7 @@ import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 
+from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
 from cloudlayer.base import CloudAdapter
@@ -151,9 +152,7 @@ class GcpAdapter(CloudAdapter):
         client = MlflowClient(tracking_uri=self.cfg.mlflow_tracking_uri)
         try:
             client.get_registered_model(name)
-        except Exception as exc:
-            if exc.__class__.__name__ != "MlflowException":
-                raise
+        except MlflowException:
             client.create_registered_model(name)
 
         run_id = model_uri.removeprefix("runs:/").split("/", 1)[0]

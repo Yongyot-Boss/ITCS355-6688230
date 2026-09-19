@@ -87,8 +87,8 @@ def split(
     shuffled = rng.permutation(groups)
 
     n = len(shuffled)
-    n_test = int(round(n * test_frac))
-    n_val = int(round(n * val_frac))
+    n_test = round(n * test_frac)
+    n_val = round(n * val_frac)
 
     test_g = set(shuffled[:n_test].tolist())
     val_g = set(shuffled[n_test:n_test + n_val].tolist())

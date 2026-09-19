@@ -58,12 +58,12 @@ def main() -> int:
     lines = [
         "# Lab 2 — Run comparison",
         "",
-        f"Experiment `{args.experiment}` · {len(table)} trials · "
-        f"total spend {table['cost_thb'].sum():.4f} THB",
+        (f"Experiment `{args.experiment}` · {len(table)} trials · "
+         f"total spend {table['cost_thb'].sum():.4f} THB"),
         "",
-        "`thb_per_point` is cost per percentage point of "
-        f"{args.metric} above the worst trial. Cheap improvements rank low; expensive "
-        "improvements rank high, however good the headline number is.",
+        ("`thb_per_point` is cost per percentage point of "
+         f"{args.metric} above the worst trial. Cheap improvements rank low; expensive "
+         "improvements rank high, however good the headline number is."),
         "",
         table.to_markdown(index=False),
         "",

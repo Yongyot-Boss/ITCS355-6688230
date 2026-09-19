@@ -119,7 +119,7 @@ def percentile(values: list[float], pct: float) -> float:
     if not values:
         return 0.0
     ordered = sorted(values)
-    idx = min(int(round((pct / 100) * (len(ordered) - 1))), len(ordered) - 1)
+    idx = min(round((pct / 100) * (len(ordered) - 1)), len(ordered) - 1)
     return ordered[idx]
 
 
