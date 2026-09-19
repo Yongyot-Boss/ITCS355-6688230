@@ -23,7 +23,7 @@ make reproduce
 
 expected test_roc_auc: 0.842 ± 0.037
 
-Runtime: about 40 seconds on 4 cores. Docker is the only runtime prerequisite; the command
+Docker is the only runtime prerequisite; the command
 generates its input data inside the image, so no cloud account, credentials, Python, or DVC
 installation is needed.
 
