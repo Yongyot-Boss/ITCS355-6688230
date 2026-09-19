@@ -44,7 +44,12 @@ class CloudAdapter(ABC):
     def wait_training(self, job_id: str) -> dict[str, Any]:
         raise NotImplementedError("Lab 2")
 
-    def register_model(self, model_uri: str, name: str) -> str:
+    def register_model(
+        self,
+        model_uri: str,
+        name: str,
+        lineage: dict[str, str] | None = None,
+    ) -> str:
         raise NotImplementedError("Lab 2")
 
     # --- Lab 3 ---------------------------------------------------------------
@@ -81,7 +86,7 @@ class CloudAdapter(ABC):
         Deletion is asynchronous on all three providers — returning successfully does
         not mean the resource is gone. Re-check, and check the bill.
         """
-        raise NotImplementedError("Lab 5")
+        raise NotImplementedError("Lab 2")
 
 
 class LocalAdapter(CloudAdapter):

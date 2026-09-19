@@ -8,8 +8,8 @@ PLATFORM ?= linux/amd64
 SEED ?= 20260101
 PYTHON ?= $(if $(VIRTUAL_ENV),$(VIRTUAL_ENV)/bin/python,$(if $(wildcard .venv/bin/python),.venv/bin/python,python))
 
-.PHONY: help setup cloud-check data test portability-audit train image image-push reproduce verify clean teardown \
-        tune compare reload-check serve serve-image loadtest drift inject-drift pipeline cost swap-check llm-eval llm-gate
+.PHONY: help setup cloud-check data test portability-audit train train-remote image image-push reproduce verify clean teardown \
+	tune compare register-model reload-check serve serve-image loadtest drift inject-drift pipeline cost swap-check llm-eval llm-gate
 
 help:
 	@grep -E "^[a-zA-Z_-]+:.*?## .*$$" $(MAKEFILE_LIST) | awk -F":.*?## " "{printf \"  %-20s %s\\n\", \$$1, \$$2}"
@@ -23,7 +23,7 @@ cloud-check: ## Resolve the eight capability slots
 	python scripts/cloud_check.py
 
 data: ## Generate the default dataset (deterministic)
-	python scripts/make_dataset.py --seed $(SEED)
+	$(PYTHON) scripts/make_dataset.py --seed $(SEED)
 
 test: ## Run data contract and split property tests
 	pytest -q tests/
@@ -33,6 +33,9 @@ portability-audit: ## Fail if provider strings leak into src/
 
 train: ## Train locally, outside the container
 	python -m src.train --seed $(SEED) --metrics-out reports/metrics.json
+
+train-remote: data image ## Submit the training image to managed Vertex AI compute
+	$(PYTHON) -c "from src import config; from cloudlayer.factory import get_adapter; cfg=config.load(); adapter=get_adapter(cfg); adapter.upload('data/raw/sensors.csv', 'raw/sensors.csv'); image=adapter.push_image('$(IMAGE):$(TAG)'); job=adapter.submit_training(image, {'seed': $(SEED), 'instance': '$${TRAIN_INSTANCE:-e2-standard-4}', 'service_account': cfg.identity_ref, 'blob_uri': cfg.blob_uri}); print(job); print(adapter.wait_training(job))"
 
 image: ## Build the training image for linux/amd64
 	docker buildx build --platform $(PLATFORM) --build-arg GIT_COMMIT=$$(git rev-parse HEAD 2>/dev/null || echo unknown) -t $(IMAGE):$(TAG) --load .
@@ -67,8 +70,11 @@ tune: ## Budgeted hyperparameter study (>=12 trials)
 compare: ## Rank runs by metric and by cost per point
 	python scripts/compare_runs.py --experiment itcs355-lab2
 
+register-model: ## Register a Lab 2 run with version-level lineage
+	python scripts/register_model.py --run-id $(RUN_ID) --training-job-id $(TRAINING_JOB_ID) --image-digest $(IMAGE_DIGEST)
+
 reload-check: ## Load the registered model by version and score rows
-	python scripts/reload_check.py --name $(MODEL_REGISTRY_NAME) --version $(VERSION)
+	$(PYTHON) scripts/reload_check.py --name $(MODEL_REGISTRY_NAME) --version $(VERSION)
 
 # --- Lab 3 -------------------------------------------------------------------
 serve: ## Run the inference service locally on :8080

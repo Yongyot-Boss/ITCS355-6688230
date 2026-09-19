@@ -20,14 +20,14 @@ PRICE_TABLE: dict[str, dict[str, float]] = {
         "ml.g4dn.xlarge": 26.0,
     },
     "azure": {
-        "Standard_DS3_v2": 8.1,
-        "Standard_F4s_v2": 6.9,
+        "Standard_DS3_v2": 10.53,
+        "Standard_F4s_v2": 6.53,
         "Standard_NC4as_T4_v3": 24.5,
     },
     "gcp": {
-        "n1-standard-4": 7.6,
-        "e2-standard-4": 6.4,
-        "n1-standard-4+t4": 25.2,
+        "n1-standard-4": 7.81,
+        "e2-standard-4": 5.51,
+        "n1-standard-4+t4": 19.47,
     },
 }
 

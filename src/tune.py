@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="ITCS355 Lab 2 — budgeted study")
     p.add_argument("--trials", type=int, default=12, help="minimum 12 for the lab")
     p.add_argument("--budget-thb", type=float, default=150.0)
-    p.add_argument("--instance", default="local", help="key into src/costs.py PRICE_TABLE")
+    p.add_argument("--instance", default="e2-standard-4", help="key into src/costs.py PRICE_TABLE")
     p.add_argument("--seed", type=int, default=seeds.DEFAULT_SEED)
     p.add_argument("--experiment", default="itcs355-lab2")
     p.add_argument("--checkpoint", type=Path, default=Path("reports/tune_checkpoint.json"),
