@@ -55,7 +55,7 @@ def main() -> int:
                 results[name] = "PASS"
             except NotImplementedError:
                 results[name] = "NOT IMPLEMENTED"
-            except Exception as exc:
+            except (OSError, RuntimeError, TypeError, ValueError) as exc:
                 results[name] = f"FAIL — {type(exc).__name__}: {exc}"
 
     for name, outcome in results.items():

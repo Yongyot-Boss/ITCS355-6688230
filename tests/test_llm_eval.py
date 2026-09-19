@@ -16,7 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src import llmcost  # noqa: E402
+from src import llmcost
 
 GOLDEN = ROOT / "evals" / "golden" / "triage.jsonl"
 BASELINE = ROOT / "evals" / "fixtures" / "triage-baseline.jsonl"
@@ -26,7 +26,7 @@ REGRESSED = ROOT / "evals" / "fixtures" / "triage-regressed.jsonl"
 def run_eval(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(ROOT / "scripts" / "llm_eval.py"), *args],
-        capture_output=True, text=True, cwd=ROOT,
+        capture_output=True, text=True, cwd=ROOT, check=False,
     )
 
 

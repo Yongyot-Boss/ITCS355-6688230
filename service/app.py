@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
     try:
         STATE["model"] = _load_model()
         log.info('"model loaded, version=%s"', STATE["version"])
-    except Exception as exc:  # readiness stays false; liveness still passes
+    except (AttributeError, EOFError, ImportError, OSError, RuntimeError, ValueError) as exc:
         STATE["model"] = None
         log.error('"model load failed: %s"', exc)
     yield

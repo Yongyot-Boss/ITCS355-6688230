@@ -51,7 +51,7 @@ def main() -> int:
             try:
                 subprocess.run(IDENTITY_CMD[provider], capture_output=True, check=True, timeout=30)
                 results.append(line("credentials", True, "identity resolved"))
-            except Exception as exc:
+            except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
                 results.append(line("credentials", False, f"{type(exc).__name__} — run the login command"))
     else:
         line("cli", True, "local provider — no CLI needed (not valid for submission)")

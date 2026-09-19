@@ -34,7 +34,7 @@ def git_commit() -> str:
             capture_output=True, text=True, check=True, cwd=config.REPO_ROOT,
         )
         return out.stdout.strip()
-    except Exception:
+    except (OSError, subprocess.CalledProcessError):
         return "unknown"
 
 

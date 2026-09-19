@@ -29,7 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src import llmcost  # noqa: E402
+from src import llmcost
 
 DEFAULT_GOLDEN = ROOT / "evals" / "golden" / "triage.jsonl"
 DEFAULT_RESPONSES = ROOT / "evals" / "fixtures" / "triage-baseline.jsonl"
@@ -219,8 +219,8 @@ def generate_live(golden: list[dict]) -> list[dict]:
     fields — do not estimate them by counting words. Every provider tokenises
     differently, and an estimated token count in a cost report is a fabricated number.
     """
-    from src import config
     from cloudlayer.factory import get_adapter
+    from src import config
 
     adapter = get_adapter(config.load())
     rows = []
