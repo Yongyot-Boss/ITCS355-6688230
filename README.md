@@ -84,6 +84,17 @@ Under time pressure, I would drop base-image digest pinning first. Hash-pinned d
 
 ---
 
+## Model registry promotion
+
+In a real organisation, promotion to staging should require approval from the ML platform owner or
+an on-call model-risk reviewer, not the person who trained the candidate. The approver should require
+the evaluation-gate result, validation and held-out test metrics, seed or cross-seed variance, cost
+estimate, data and code versions, image digest, MLflow run ID, training-job ID, and a successful
+reload check from the registry. They should also confirm that the lineage tags are present on the
+registered model version and that a rollback candidate exists before assigning the `staging` alias.
+
+---
+
 ## Checklist before you submit
 
 - [ ] `make reproduce` works from a fresh clone, on a machine that is not yours

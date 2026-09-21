@@ -185,6 +185,10 @@ class GcpAdapter(CloudAdapter):
             client.set_model_version_tag(name, version.version, key, str(value))
         return str(version.version)
 
+    def promote_model(self, name: str, version: str, stage: str = "staging") -> None:
+        client = MlflowClient(tracking_uri=self.cfg.mlflow_tracking_uri)
+        client.set_registered_model_alias(name, stage, version)
+
     # submit_training / register_model  -> Lab 2 (Vertex custom training + Model Registry)
     # deploy / invoke                   -> Lab 3 (Vertex Endpoint)
     # emit_metric                       -> Lab 4 (Cloud Monitoring time series)

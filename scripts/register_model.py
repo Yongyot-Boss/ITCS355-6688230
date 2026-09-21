@@ -24,6 +24,7 @@ def main() -> int:
     parser.add_argument("--training-job-id", required=True)
     parser.add_argument("--image-digest", required=True)
     parser.add_argument("--name", default=None)
+    parser.add_argument("--stage", default="staging")
     args = parser.parse_args()
 
     cfg = config.load(strict=False)
@@ -41,8 +42,11 @@ def main() -> int:
     }
     model_uri = f"runs:/{args.run_id}/model"
     model_name = args.name or cfg.model_registry_name
-    version = get_adapter(cfg).register_model(model_uri, model_name, tags)
+    adapter = get_adapter(cfg)
+    version = adapter.register_model(model_uri, model_name, tags)
+    adapter.promote_model(model_name, version, args.stage)
     print(f"registered {model_uri} as {model_name} version {version}")
+    print(f"promoted {model_name} version {version} to {args.stage}")
     for key, value in tags.items():
         print(f"{key}={value}")
     return 0
