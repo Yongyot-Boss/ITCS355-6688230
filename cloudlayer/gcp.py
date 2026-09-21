@@ -19,6 +19,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -131,16 +132,34 @@ class GcpAdapter(CloudAdapter):
         return submitted.stdout.strip() or job_id
 
     def wait_training(self, job_id: str) -> dict[str, object]:
-        result = subprocess.run(
-            [
-                "gcloud", "ai", "custom-jobs", "wait", job_id,
-                "--project", self.cfg.project_id, "--region", self.cfg.region, "--format", "json",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        return json.loads(result.stdout)
+        terminal_states = {
+            "JOB_STATE_SUCCEEDED",
+            "JOB_STATE_FAILED",
+            "JOB_STATE_CANCELLED",
+            "JOB_STATE_PAUSED",
+            "JOB_STATE_EXPIRED",
+        }
+        deadline = time.monotonic() + 3600
+        while time.monotonic() < deadline:
+            result = subprocess.run(
+                [
+                    "gcloud", "ai", "custom-jobs", "describe", job_id,
+                    "--project", self.cfg.project_id, "--region", self.cfg.region,
+                    "--format", "json",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            status = json.loads(result.stdout)
+            state = status.get("state")
+            if state in terminal_states:
+                if state != "JOB_STATE_SUCCEEDED":
+                    detail = status.get("error", status.get("stateMessage", "no error detail"))
+                    raise RuntimeError(f"Vertex custom job {state}: {detail}")
+                return status
+            time.sleep(10)
+        raise TimeoutError(f"Vertex custom job did not finish within 3600 seconds: {job_id}")
 
     def register_model(
         self,
