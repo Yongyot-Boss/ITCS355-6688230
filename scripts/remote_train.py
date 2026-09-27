@@ -22,6 +22,8 @@ def main() -> None:
     if not args.blob_uri:
         raise ValueError("BLOB_URI is required for managed training")
     os.environ["BLOB_URI"] = args.blob_uri
+    os.environ["MLFLOW_TRACKING_URI"] = "sqlite:////tmp/mlflow.db"
+    Path("reports").mkdir(parents=True, exist_ok=True)
     base = urlparse(args.blob_uri)
     bucket = storage.Client().bucket(base.netloc)
     prefix = base.path.strip("/")

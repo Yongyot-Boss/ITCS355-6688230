@@ -8,25 +8,51 @@ Run locally:  uvicorn service.app:app --port 8080
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from service.schemas import BatchRequest, BatchResponse, PredictRequest, PredictResponse
+from service.schemas import (
+    BatchRequest,
+    BatchResponse,
+    HealthResponse,
+    PredictRequest,
+    PredictResponse,
+    ReadyResponse,
+)
 
 logging.basicConfig(
     level=logging.INFO,
-    format='{"ts":"%(asctime)s","level":"%(levelname)s","msg":%(message)s}',
+    format="%(message)s",
 )
 log = logging.getLogger("service")
 
 STATE: dict[str, Any] = {"model": None, "version": os.environ.get("MODEL_VERSION", "unknown")}
+
+
+def _log_event(event: str, **fields: Any) -> None:
+    log.info(
+        "%s",
+        json.dumps(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "level": "INFO",
+                "event": event,
+                **fields,
+            },
+            separators=(",", ":"),
+        ),
+    )
 
 
 def _load_model():
@@ -42,6 +68,14 @@ def _load_model():
 
         mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
         return mlflow.sklearn.load_model(f"models:/{name}/{version}")
+
+    artifact_uri = os.environ.get("MODEL_ARTIFACT_URI")
+    if artifact_uri:
+        import joblib
+        import mlflow
+
+        artifact_path = mlflow.artifacts.download_artifacts(artifact_uri=artifact_uri)
+        return joblib.load(artifact_path)
 
     # Fallback for local development and tests only. Submitting this is not acceptable:
     # your deployed service must load a registered version.
@@ -61,15 +95,46 @@ def _load_model():
 async def lifespan(app: FastAPI):
     try:
         STATE["model"] = _load_model()
-        log.info('"model loaded, version=%s"', STATE["version"])
-    except (AttributeError, EOFError, ImportError, OSError, RuntimeError, ValueError) as exc:
+        _log_event("model_loaded", model_version=STATE["version"])
+    except Exception as exc:
         STATE["model"] = None
-        log.error('"model load failed: %s"', exc)
+        log.error(
+            "%s",
+            json.dumps(
+                {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "level": "ERROR",
+                    "event": "model_load_failed",
+                    "error": str(exc),
+                    "model_version": STATE["version"],
+                },
+                separators=(",", ":"),
+            ),
+        )
     yield
     STATE["model"] = None
 
 
 app = FastAPI(title="ITCS355 inference", version="1.0.0", lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content=jsonable_encoder(
+            {"detail": exc.errors(), "model_version": str(STATE["version"])}
+        ),
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_error(request: Request, exc: HTTPException) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "model_version": str(STATE["version"])},
+        headers=exc.headers,
+    )
 
 
 @app.middleware("http")
@@ -80,21 +145,25 @@ async def add_request_context(request: Request, call_next):
     latency_ms = (time.perf_counter() - started) * 1000
     response.headers["x-request-id"] = request_id
     response.headers["x-model-version"] = str(STATE["version"])
-    log.info(
-        '{"request_id":"%s","path":"%s","status":%d,"latency_ms":%.2f,"model_version":"%s"}',
-        request_id, request.url.path, response.status_code, latency_ms, STATE["version"],
+    _log_event(
+        "request_complete",
+        request_id=request_id,
+        path=request.url.path,
+        status=response.status_code,
+        latency_ms=round(latency_ms, 2),
+        model_version=str(STATE["version"]),
     )
     return response
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
+@app.get("/health", response_model=HealthResponse)
+def health() -> HealthResponse:
     """Liveness. The process is up. Says nothing about whether it can serve."""
-    return {"status": "alive"}
+    return HealthResponse(status="alive", model_version=str(STATE["version"]))
 
 
-@app.get("/ready")
-def ready():
+@app.get("/ready", response_model=ReadyResponse)
+def ready() -> ReadyResponse | JSONResponse:
     """Readiness. The model is loaded and can score.
 
     These two are genuinely different, and confusing them causes a specific production
@@ -102,8 +171,15 @@ def ready():
     providers distinguish them, and Quiz 3 asks about it.
     """
     if STATE["model"] is None:
-        return JSONResponse(status_code=503, content={"status": "not_ready", "reason": "model not loaded"})
-    return {"status": "ready", "model_version": STATE["version"]}
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not_ready",
+                "reason": "model not loaded",
+                "model_version": str(STATE["version"]),
+            },
+        )
+    return ReadyResponse(status="ready", model_version=str(STATE["version"]))
 
 
 def _score(rows: list[dict]) -> list[float]:

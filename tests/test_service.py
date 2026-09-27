@@ -1,6 +1,8 @@
 """Lab 3/4 — service contract tests."""
 from __future__ import annotations
 
+import json
+import logging
 import os
 
 import pytest
@@ -45,10 +47,13 @@ def client():
 
 def test_health_and_ready_are_different(client):
     """Liveness passes whenever the process is up. Readiness only when it can score."""
-    assert client.get("/health").json()["status"] == "alive"
+    health = client.get("/health").json()
+    assert health["status"] == "alive"
+    assert health["model_version"] == "test-1"
     ready = client.get("/ready")
     assert ready.status_code == 200
     assert ready.json()["status"] == "ready"
+    assert ready.json()["model_version"] == "test-1"
 
 
 def test_predict_returns_probability_and_version(client):
@@ -63,7 +68,39 @@ def test_predict_returns_probability_and_version(client):
 
 def test_out_of_range_input_is_rejected(client):
     bad = {**VALID, "load_pct": 250.0}
-    assert client.post("/predict", json=bad).status_code == 422
+    response = client.post("/predict", json=bad)
+    assert response.status_code == 422
+    assert response.json()["detail"]
+    assert response.json()["model_version"] == "test-1"
+
+
+def test_model_unavailable_response_includes_version(client, monkeypatch):
+    from service.app import STATE
+
+    monkeypatch.setitem(STATE, "model", None)
+    response = client.post("/predict", json=VALID)
+    assert response.status_code == 503
+    assert response.json()["model_version"] == "test-1"
+    ready = client.get("/ready")
+    assert ready.status_code == 503
+    assert ready.json()["status"] == "not_ready"
+    assert ready.json()["model_version"] == "test-1"
+
+
+def test_request_log_is_structured_json(client, caplog):
+    from service.app import log
+
+    with caplog.at_level(logging.INFO, logger=log.name):
+        client.get("/health", headers={"x-request-id": 'request-"quoted"'})
+
+    record = next(
+        item for item in caplog.records
+        if '"request_id"' in item.getMessage()
+    )
+    event = json.loads(record.getMessage())
+    assert event["request_id"] == 'request-"quoted"'
+    assert event["latency_ms"] >= 0
+    assert event["model_version"] == "test-1"
 
 
 def test_unknown_field_is_rejected(client):

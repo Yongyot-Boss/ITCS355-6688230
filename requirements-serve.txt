@@ -1,4 +1,4 @@
-# TODO(Lab 3): regenerate with hashes, as in Lab 1.
+# Serving-image dependencies. Versions are pinned to make the service build repeatable.
 fastapi==0.141.1
 uvicorn==0.34.0
 pydantic==2.13.5
@@ -7,3 +7,4 @@ numpy==2.4.4
 scikit-learn==1.8.0
 mlflow==3.16.0
 joblib==1.4.2
+google-cloud-storage==3.7.0

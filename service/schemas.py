@@ -8,6 +8,8 @@ contract test, the same bounds are what CI asserts against.
 """
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -34,3 +36,14 @@ class BatchRequest(BaseModel):
 class BatchResponse(BaseModel):
     probabilities: list[float]
     model_version: str
+
+
+class HealthResponse(BaseModel):
+    status: Literal["alive"]
+    model_version: str
+
+
+class ReadyResponse(BaseModel):
+    status: Literal["ready", "not_ready"]
+    model_version: str
+    reason: str | None = None

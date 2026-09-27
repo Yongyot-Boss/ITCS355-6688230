@@ -84,12 +84,11 @@ class CloudAdapter(ABC):
         raise NotImplementedError("Lab 5")
 
     def teardown(self, tags: dict[str, str]) -> list[str]:
-        """Delete every resource carrying these tags. Returns what was deleted.
+        """Tear down resources carrying these tags and return affected resources.
 
-        Deletion is asynchronous on all three providers — returning successfully does
-        not mean the resource is gone. Re-check, and check the bill.
+        Cloud cleanup may be asynchronous. Re-check the resources and the bill.
         """
-        raise NotImplementedError("Lab 2")
+        raise NotImplementedError("Lab 5")
 
 
 class LocalAdapter(CloudAdapter):

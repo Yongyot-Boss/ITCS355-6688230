@@ -133,20 +133,43 @@ utilisation. State the utilisation assumption explicitly — it is where the num
 Then answer in two lines: at what request volume would batch inference be cheaper than keeping this
 endpoint warm?
 
+Answer:
+
+Using the `n1-standard-2` on-demand rate of USD 0.0949995/hour and an indicative
+25 September 2026 exchange rate of 33.405 THB/USD, the hourly instance rate is
+**3.1735 THB/hour**. The 10-VU test achieved **1.6154 predictions/second**. With
+an explicit **50% utilisation** assumption, the calculation is:
+
+```text
+THB / 1,000 predictions = 3.1735 / (1.6154 x 3,600 x 0.50) x 1,000
+                          = 1.0914 THB per 1,000 predictions
+```
+
+This is a compute-only planning estimate; Vertex AI management charges, storage,
+network egress, and currency movements are excluded. The N1 price is from the
+[Google Cloud N1 pricing page](https://cloud.google.com/products/compute/pricing/general-purpose);
+the final submission should be reconciled with the project's Billing export.
+
+With one scheduled batch run per day that completes within one hour, batch is cheaper
+from **1 through about 5,815 predictions/day** (about 174,462/month): it uses 30
+instance-hours/month versus 720 instance-hours/month for an always-warm endpoint.
+Above 5,815 predictions/day, batch is still cheaper whenever all daily batch work
+finishes in under 24 instance-hours; measure the actual batch runtime before claiming
+an all-in break-even point.
 ---
 
 ## Deliverables checklist
 
-- [ ] FastAPI service with all four routes, schema validation, structured logs, version in response
-- [ ] Model loaded once at startup from the registry by version
-- [ ] `deploy()` and `invoke()` implemented; endpoint live and smoke-tested
+- [x] FastAPI service with all four routes, schema validation, structured logs, version in response
+- [x] Model loaded once at startup from the registry by version
+- [x] `deploy()` and `invoke()` implemented; endpoint live and smoke-tested
 - [ ] Committed load-test script
-- [ ] `reports/lab3-load.md` — three concurrency levels, p50/p95/p99, throughput, error rate
+- [x] `reports/lab3-load.md` — three concurrency levels, p50/p95/p99, throughput, error rate
 - [ ] Stated latency target, the configuration that meets it, and the breaking concurrency
-- [ ] Batch, payload, and instance-size findings with cost deltas
-- [ ] Canary config, detection write-up, and timestamped rollback evidence
-- [ ] Cost per 1,000 predictions with method and utilisation assumption
-- [ ] **`make teardown` run and confirmed**
+- [x] Batch, payload, and instance-size findings with cost deltas
+- [x] Canary config, detection write-up, and timestamped rollback evidence
+- [x] Cost per 1,000 predictions with method and utilisation assumption
+- [x] **`make teardown` run and confirmed**
 
 ## Acceptance criteria
 

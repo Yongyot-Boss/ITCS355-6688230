@@ -25,3 +25,4 @@ __pycache__/
 
 # ruff cache
 .ruff_cache/
+drill3.md
