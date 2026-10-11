@@ -46,11 +46,11 @@ def test_registered_version_loads_its_logged_model_output(monkeypatch):
 
 def test_deploy_configures_vertex_routes_and_returns_endpoint(monkeypatch):
     adapter = GcpAdapter(config.load(strict=False))
-    monkeypatch.setenv("SERVING_IMAGE_URI", "asia-southeast1-docker.pkg.dev/p/r/i@sha256:abc")
+    monkeypatch.setenv("SERVING_IMAGE_URI", "registry.example.test/p/r/i@sha256:abc")
     monkeypatch.setattr(
         adapter,
         "_stage_model_artifact",
-        lambda model_ref, endpoint: ("gs://bucket/models/3/model.joblib", "3"),
+        lambda model_ref, endpoint: ("object://bucket/models/3/model.joblib", "3"),
     )
     monkeypatch.setattr(
         adapter,
