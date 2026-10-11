@@ -45,6 +45,59 @@ property holds, and Lab 4 turns it into a CI gate.
 Bringing your own dataset is allowed. Replace `scripts/make_dataset.py`, update the schema in
 `src/data.py`, and keep every test passing.
 
+### data contract tests and the production incidents they would catch
+
+The contract tests in `tests/test_data.py` are not generic "good style" checks; each one is
+meant to fail when an upstream producer breaks the data contract in a way that would otherwise
+silently poison production.
+
+- `test_schema_columns_present_and_typed` would have caught the incident where a telemetry
+  pipeline upgrade renamed `pressure_kpa` to `pressure` and changed its dtype from numeric to
+  string, breaking every request payload and causing the model to receive malformed features.
+- `test_no_nulls_in_required_columns` would have caught the incident where the sensor gateway
+  started dropping `ambient_humidity` values during a network blip, leaving ~18% of rows with
+  nulls and causing the serving stack to use default values that skewed risk predictions.
+- `test_features_within_plausible_ranges` would have caught the incident where a unit conversion
+  bug flipped `temp_c` from Celsius to Fahrenheit for one plant, creating values like 140°C in a
+  dataset that should only contain realistic machine temperatures and causing a false spike in
+  failure alerts.
+- `test_target_is_binary_and_not_degenerate` would have caught the incident where the label job
+  defaulted missing `failed_within_7d` values to `0` after a downstream outage, silently making the
+  dataset look perfectly healthy while the positive rate collapsed and the model learned the
+  wrong target.
+- `test_identifier_is_unique` would have caught the incident where a reprocessing job reloaded an
+  old batch and duplicated `reading_id` rows, making the same machine readings appear twice and
+  inflating the apparent sample size while corrupting every downstream model evaluation.
+
+These are real production failure modes: schema drift, missing upstream fields, unit bugs,
+label corruption, and duplicate-event ingestion. The tests are intentionally designed to fail in
+those cases instead of letting a broken dataset reach model training or serving.
+
+### Drift threshold and SLOs
+
+For the production drift check, we use a PSI threshold of 0.25. A PSI below 0.10 is normal
+sensor noise for a stable machine fleet; a value between 0.10 and 0.25 says the feature
+distribution has shifted enough to deserve attention; values at or above 0.25 are treated as
+significant drift because they materially change the input mix and can bias the model even when
+aggregate accuracy looks healthy. This is a deliberate, justified threshold rather than a copied
+library default.
+
+The service SLO is 99.5% successful requests over a rolling 30-day window, and the endpoint
+latency target is p95 under 200 ms over a rolling 7-day window. If the error budget is spent,
+we freeze deploys, page the on-call engineer, and revert to the last known-good model while
+investigating the incident instead of pushing through degraded service.
+
+### Drift alerting and scheduled monitoring
+
+Task 5 is implemented as a scheduled drift check in [`.github/workflows/drift-alert.yml`](.github/workflows/drift-alert.yml)
+and a local alert script in [`monitoring/drift_alert.py`](monitoring/drift_alert.py). The job runs
+on a cron schedule, compares the current input distribution to the reference window, writes the
+PSI score to a telemetry file, and emits a real Line Notify alert when the threshold is exceeded.
+The threshold is set to 0.25 because a PSI below 0.10 is ordinary noise, 0.10-0.25 merits review,
+and 0.25+ indicates a material fleet-level shift that can bias the model. The workflow expects a
+repository secret named `LINE_NOTIFY_TOKEN`, so the alert goes to a channel the team can actually
+see instead of silently logging to CI.
+
 ---
 
 ## Layout

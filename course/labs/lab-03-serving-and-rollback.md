@@ -163,9 +163,9 @@ an all-in break-even point.
 - [x] FastAPI service with all four routes, schema validation, structured logs, version in response
 - [x] Model loaded once at startup from the registry by version
 - [x] `deploy()` and `invoke()` implemented; endpoint live and smoke-tested
-- [ ] Committed load-test script
+- [x] Committed load-test script
 - [x] `reports/lab3-load.md` — three concurrency levels, p50/p95/p99, throughput, error rate
-- [ ] Stated latency target, the configuration that meets it, and the breaking concurrency
+- [x] Stated latency target, the configuration that meets it, and the breaking concurrency
 - [x] Batch, payload, and instance-size findings with cost deltas
 - [x] Canary config, detection write-up, and timestamped rollback evidence
 - [x] Cost per 1,000 predictions with method and utilisation assumption

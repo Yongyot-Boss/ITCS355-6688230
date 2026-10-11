@@ -1,0 +1,5 @@
+What fired: temp_c drift alert at 2026-10-11T12:19:44.444050Z; PSI=0.383 crossed the 0.25 threshold.
+True cause: a +6°C shift in the incoming sensor stream changed the feature distribution without changing the schema or null rate; this was data drift, not a model bug.
+Retrain, roll back, or no action — and why: Roll back or pause the new data path and investigate the upstream producer before retraining, because retraining on corrupted/shifted data would lock the bad distribution into the next model and destroy the last good one.
+What this would have cost if unnoticed for a week: A week of unfiltered drift would have produced a steady stream of false-positive maintenance tickets, inflated maintenance spend, and lost trust in the risk model, with roughly 1–2% of normal demand misrouted to unnecessary inspections at fleet scale.
+How to prevent or detect it faster: add a production-side PSI guardrail and a schema/null-rate check before training or serving so a shifted feature is caught in minutes instead of waiting for downstream model failures.

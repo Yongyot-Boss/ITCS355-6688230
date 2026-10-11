@@ -119,3 +119,16 @@ class LocalAdapter(CloudAdapter):
         raise NotImplementedError(
             "LocalAdapter cannot push images. Implement your provider's adapter for Lab 1 submission."
         )
+
+    def emit_metric(self, name: str, value: float, unit: str = "None") -> None:
+        """Write a metric to local telemetry files for dev/test runs.
+
+        This keeps the Lab 4 monitoring flow working in a local checkout without a cloud
+        account, while still preserving the provider-neutral interface expected by the code.
+        """
+        from pathlib import Path
+
+        path = Path(self.cfg.reports_dir) / "telemetry.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(f"{name}\t{value}\t{unit}\n")

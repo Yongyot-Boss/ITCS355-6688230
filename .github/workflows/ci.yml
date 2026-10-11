@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -30,6 +32,9 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
           # TODO(Lab 4): once requirements.txt carries hashes, add --require-hashes.
+
+      - name: Secret scan
+        run: make scan-secrets
 
       - name: Lint
         # ruff is pinned in requirements.txt and installed above. Installing it unpinned

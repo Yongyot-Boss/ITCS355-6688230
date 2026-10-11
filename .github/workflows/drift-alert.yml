@@ -1,0 +1,35 @@
+name: Drift alert
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate a current snapshot
+        run: python scripts/inject_drift.py --feature temp_c --mode shift --magnitude 6
+
+      - name: Detect drift and emit metric
+        env:
+          CLOUD_PROVIDER: local
+        run: python -m monitoring.drift --current data/current.csv --emit
+
+      - name: Send alert to Line Notify when drift exceeds threshold
+        env:
+          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
+        run: python monitoring/drift_alert.py --current data/current.csv --threshold 0.25

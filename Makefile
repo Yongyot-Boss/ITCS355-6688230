@@ -28,6 +28,9 @@ data: ## Generate the default dataset (deterministic)
 test: ## Run data contract and split property tests
 	pytest -q tests/
 
+scan-secrets: ## Fail if secret-like material appears anywhere in git history
+	python scripts/scan_secrets.py
+
 portability-audit: ## Fail if provider strings leak into src/
 	python scripts/portability_audit.py
 
@@ -118,6 +121,9 @@ inject-drift: ## Shift a feature's distribution on purpose
 
 drift: ## Score drift against the reference window
 	python -m monitoring.drift --current data/current.csv
+
+drift-alert: ## Check drift and send a Line Notify alert when the threshold is exceeded
+	python monitoring/drift_alert.py --current data/current.csv --threshold 0.25
 
 # --- Lab 5 -------------------------------------------------------------------
 pipeline: ## Compile pipeline/pipeline.yaml for your provider
