@@ -10,7 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pandas as pd
 import requests
 from sklearn.metrics import brier_score_loss, roc_auc_score
 

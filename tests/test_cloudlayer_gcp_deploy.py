@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import mlflow
 import mlflow.sklearn
+
 from cloudlayer.gcp import GcpAdapter
 from src import config
 
@@ -14,8 +15,6 @@ from src import config
 def test_registered_version_loads_its_logged_model_output(monkeypatch):
     adapter = GcpAdapter(config.load(strict=False))
     logged_model_uri = "models:/m-logged-model"
-    loaded = object()
-
     class Client:
         def __init__(self, tracking_uri):
             assert tracking_uri == adapter.cfg.mlflow_tracking_uri

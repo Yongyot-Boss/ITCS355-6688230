@@ -21,6 +21,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from mlflow.exceptions import MlflowException
 
 from service.schemas import (
     BatchRequest,
@@ -96,7 +97,7 @@ async def lifespan(app: FastAPI):
     try:
         STATE["model"] = _load_model()
         _log_event("model_loaded", model_version=STATE["version"])
-    except Exception as exc:
+    except (ImportError, MlflowException, OSError, RuntimeError, TypeError, ValueError) as exc:
         STATE["model"] = None
         log.error(
             "%s",

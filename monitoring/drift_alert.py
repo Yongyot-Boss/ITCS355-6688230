@@ -13,6 +13,7 @@ import os
 import sys
 from pathlib import Path
 from urllib import request
+from urllib.error import URLError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -41,7 +42,7 @@ def _send_line_notify(message: str, token: str | None) -> bool:
             body = resp.read().decode("utf-8", "replace")
         print(f"Line Notify response: {body}")
         return True
-    except Exception as exc:  # pragma: no cover - network failure path
+    except URLError as exc:
         print(f"Line Notify failed: {exc}")
         return False
 
