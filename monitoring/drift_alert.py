@@ -3,17 +3,18 @@
 This script keeps the monitoring loop real without requiring a provider-specific SDK:
 - it compares the current production snapshot against the training reference window,
 - writes the score to a local metrics file so dashboards can read it,
-- sends a Line Notify alert when a token is configured.
+- sends an email alert through a configured SMTP relay.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import smtplib
+import ssl
 import sys
+from email.message import EmailMessage
 from pathlib import Path
-from urllib import request
-from urllib.error import URLError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -23,28 +24,61 @@ from monitoring.drift import compare
 from src import data
 
 
-def _send_line_notify(message: str, token: str | None) -> bool:
-    if not token:
-        print("LINE_NOTIFY_TOKEN not set — alert skipped.")
-        return False
-    payload = "message=" + message.replace("\n", " ")
-    req = request.Request(
-        "https://notify-api.line.me/api/notify",
-        data=payload.encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        method="POST",
-    )
+def _send_email(
+    message: str,
+    *,
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    sender: str,
+    recipient: str,
+) -> bool:
+    email = EmailMessage()
+    email["Subject"] = "ITCS355 production feature drift alert"
+    email["From"] = sender
+    email["To"] = recipient
+    email.set_content(message)
     try:
-        with request.urlopen(req, timeout=20) as resp:
-            body = resp.read().decode("utf-8", "replace")
-        print(f"Line Notify response: {body}")
+        with smtplib.SMTP(host, port, timeout=20) as client:
+            client.starttls(context=ssl.create_default_context())
+            client.login(username, password)
+            client.send_message(email)
+        print(f"Drift alert email sent to {recipient}.")
         return True
-    except URLError as exc:
-        print(f"Line Notify failed: {exc}")
+    except (OSError, smtplib.SMTPException) as exc:
+        print(f"Drift alert email delivery failed: {exc}")
         return False
+
+
+def _email_settings() -> dict[str, str | int]:
+    required = {
+        "SMTP_HOST": os.getenv("SMTP_HOST"),
+        "SMTP_USERNAME": os.getenv("SMTP_USERNAME"),
+        "SMTP_PASSWORD": os.getenv("SMTP_PASSWORD"),
+        "DRIFT_EMAIL_FROM": os.getenv("DRIFT_EMAIL_FROM"),
+        "DRIFT_EMAIL_TO": os.getenv("DRIFT_EMAIL_TO"),
+    }
+    missing = [name for name, value in required.items() if not value]
+    if missing:
+        raise RuntimeError(
+            "Email alert is enabled by a drift breach but SMTP configuration is missing: "
+            + ", ".join(missing)
+        )
+    try:
+        port = int(os.getenv("SMTP_PORT", "587"))
+    except ValueError as exc:
+        raise RuntimeError("SMTP_PORT must be an integer") from exc
+    if not 1 <= port <= 65535:
+        raise RuntimeError("SMTP_PORT must be between 1 and 65535")
+    return {
+        "host": required["SMTP_HOST"] or "",
+        "port": port,
+        "username": required["SMTP_USERNAME"] or "",
+        "password": required["SMTP_PASSWORD"] or "",
+        "sender": required["DRIFT_EMAIL_FROM"] or "",
+        "recipient": required["DRIFT_EMAIL_TO"] or "",
+    }
 
 
 def main() -> int:
@@ -85,8 +119,8 @@ def main() -> int:
             f"Drift alert: {worst.feature} PSI={max_psi:.3f} exceeds the {args.threshold:.2f} threshold. "
             f"Review the upstream stream before retraining."
         )
-        token = os.getenv("LINE_NOTIFY_TOKEN")
-        sent = _send_line_notify(message, token)
+        settings = _email_settings()
+        sent = _send_email(message, **settings)
         print(f"ALERT: {message}")
         return 0 if sent else 1
 

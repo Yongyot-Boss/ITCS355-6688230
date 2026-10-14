@@ -21,15 +21,43 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Generate a current snapshot
-        run: python scripts/inject_drift.py --feature temp_c --mode shift --magnitude 6
+      - name: Download the latest production input snapshot
+        env:
+          DRIFT_CURRENT_URL: ${{ secrets.DRIFT_CURRENT_URL }}
+        run: |
+          if [ -z "$DRIFT_CURRENT_URL" ]; then
+            echo "DRIFT_CURRENT_URL secret is required and must point to the latest production input CSV." >&2
+            exit 1
+          fi
+          if ! curl --silent --show-error --fail --location \
+            "$DRIFT_CURRENT_URL" --output data/current.csv 2>/dev/null; then
+            echo "Could not download the latest production input snapshot." >&2
+            exit 1
+          fi
+          test -s data/current.csv
 
       - name: Detect drift and emit metric
         env:
           CLOUD_PROVIDER: local
         run: python -m monitoring.drift --current data/current.csv --emit
 
-      - name: Send alert to Line Notify when drift exceeds threshold
+      - name: Email alert when drift exceeds threshold
         env:
-          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT || '587' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          DRIFT_EMAIL_FROM: ${{ vars.DRIFT_EMAIL_FROM }}
+          DRIFT_EMAIL_TO: ${{ vars.DRIFT_EMAIL_TO }}
         run: python monitoring/drift_alert.py --current data/current.csv --threshold 0.25
+
+      - name: Preserve drift metrics and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-metrics-${{ github.run_id }}
+          path: |
+            reports/drift.json
+            reports/drift_alert.json
+            reports/telemetry.jsonl
+          if-no-files-found: ignore

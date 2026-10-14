@@ -90,13 +90,24 @@ investigating the incident instead of pushing through degraded service.
 ### Drift alerting and scheduled monitoring
 
 Task 5 is implemented as a scheduled drift check in [`.github/workflows/drift-alert.yml`](.github/workflows/drift-alert.yml)
-and a local alert script in [`monitoring/drift_alert.py`](monitoring/drift_alert.py). The job runs
-on a cron schedule, compares the current input distribution to the reference window, writes the
-PSI score to a telemetry file, and emits a real Line Notify alert when the threshold is exceeded.
-The threshold is set to 0.25 because a PSI below 0.10 is ordinary noise, 0.10-0.25 merits review,
-and 0.25+ indicates a material fleet-level shift that can bias the model. The workflow expects a
-repository secret named `LINE_NOTIFY_TOKEN`, so the alert goes to a channel the team can actually
-see instead of silently logging to CI.
+and an alert script in [`monitoring/drift_alert.py`](monitoring/drift_alert.py). Every six hours,
+the job downloads the latest production input CSV from the `DRIFT_CURRENT_URL` repository secret,
+compares it with the training reference window, emits PSI metrics, and preserves the report and
+telemetry as a workflow artifact. It sends an email when any feature reaches PSI 0.25. A PSI below
+0.10 is ordinary sensor noise, 0.10-0.25 merits review, and 0.25+ is a material fleet-level shift
+that can bias the model.
+
+Configure these GitHub repository settings before enabling the schedule:
+
+- Secret `DRIFT_CURRENT_URL`: protected HTTPS URL serving the latest production input CSV (features
+  only is sufficient; it must use the columns in `src/data.py`).
+- Variables `SMTP_HOST`, `SMTP_PORT` (normally `587`), `DRIFT_EMAIL_FROM`, and `DRIFT_EMAIL_TO`.
+- Secrets `SMTP_USERNAME` and `SMTP_PASSWORD`.
+
+`DRIFT_EMAIL_TO` should be the team's monitored on-call mailbox or paging-enabled distribution
+list; the person/group responsible for that mailbox will see overnight alerts. SMTP uses STARTTLS.
+If the drift threshold is breached but the snapshot or mail configuration is unavailable, the
+workflow fails visibly rather than reporting successful delivery.
 
 ---
 
