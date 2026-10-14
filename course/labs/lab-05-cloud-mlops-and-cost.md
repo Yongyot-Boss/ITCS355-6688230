@@ -70,6 +70,12 @@ pipeline definition.
 
 ## Task 2 — Least privilege, properly (45 min)
 
+> **Azure for Students note.** The 3 vCPU regional cap applies here too and cannot be raised, so
+> managed training jobs and managed endpoints on 4-vCPU sizes will not run. Use `Standard_B2s` for
+> compute and Container Apps for serving. Report this in your cost write-up — *"the instance I
+> would choose is not one I can run"* is a real finding about operating under constraints, and it
+> is worth more than a cost table that quietly assumes hardware you never had.
+
 Replace whatever broad permissions you have been using with scoped identities. At minimum, separate:
 
 - the **training** identity — read data, write artifacts and metrics
