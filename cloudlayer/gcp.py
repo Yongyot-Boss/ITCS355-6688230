@@ -97,6 +97,49 @@ class GcpAdapter(CloudAdapter):
                 return digest
         raise RuntimeError(f"No pushed digest found for {remote_tag}")
 
+    def emit_metric(self, name: str, value: float, unit: str = "1") -> None:
+        """Write a gauge sample to Cloud Monitoring as a custom metric."""
+        import google.auth
+        from google.auth.transport.requests import AuthorizedSession
+
+        credentials, _ = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/monitoring.write"]
+        )
+        session = AuthorizedSession(credentials)
+        response = session.post(
+            f"https://monitoring.googleapis.com/v3/projects/{self.cfg.project_id}/timeSeries",
+            json={
+                "timeSeries": [
+                    {
+                        "metric": {"type": f"custom.googleapis.com/{name}"},
+                        "resource": {
+                            "type": "global",
+                            "labels": {"project_id": self.cfg.project_id},
+                        },
+                        "metricKind": "GAUGE",
+                        "valueType": "DOUBLE",
+                        "unit": unit,
+                        "points": [
+                            {
+                                "interval": {
+                                    "endTime": time.strftime(
+                                        "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                                    )
+                                },
+                                "value": {"doubleValue": value},
+                            }
+                        ],
+                    }
+                ]
+            },
+            timeout=20,
+        )
+        if not response.ok:
+            raise RuntimeError(
+                f"Cloud Monitoring rejected metric {name!r}: "
+                f"HTTP {response.status_code}: {response.text}"
+            )
+
     def submit_training(self, image_uri: str, args: dict[str, object]) -> str:
         job_id = str(args.get("job_id") or f"itcs355-{os.getpid()}-{os.urandom(3).hex()}")
         machine_type = str(args.get("instance", "e2-standard-4"))

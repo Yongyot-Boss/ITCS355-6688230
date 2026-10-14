@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import smtplib
+import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -78,3 +80,139 @@ def test_send_email_reports_smtp_failure(monkeypatch, capsys):
         recipient="on-call@example.test",
     )
     assert "email delivery failed" in capsys.readouterr().out
+
+
+def test_breach_emits_metric_and_sends_email(monkeypatch, tmp_path):
+    metrics = []
+    emails = []
+    adapter = SimpleNamespace(emit_metric=lambda name, value: metrics.append((name, value)))
+    result = SimpleNamespace(
+        feature="temp_c",
+        psi=0.4,
+        ks_statistic=0.3,
+        verdict="significant",
+        ref_mean=79.5,
+        cur_mean=85.5,
+    )
+    monkeypatch.setattr(drift_alert.pd, "read_csv", lambda _: object())
+    monkeypatch.setattr(drift_alert, "compare", lambda *_: [result])
+    monkeypatch.setattr(drift_alert, "_email_settings", lambda: {"host": "smtp"})
+    monkeypatch.setattr(
+        drift_alert,
+        "_send_email",
+        lambda message, **settings: emails.append((message, settings)) or True,
+    )
+    monkeypatch.setattr(
+        "cloudlayer.factory.get_adapter",
+        lambda config: adapter,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "drift_alert.py",
+            "--reference",
+            str(tmp_path / "reference.csv"),
+            "--current",
+            str(tmp_path / "current.csv"),
+            "--out",
+            str(tmp_path / "alert.json"),
+            "--threshold",
+            "0.25",
+            "--emit",
+        ],
+    )
+
+    assert drift_alert.main() == 0
+    assert metrics == [("drift.psi.temp_c", 0.4)]
+    assert "temp_c PSI=0.400" in emails[0][0]
+
+
+def test_gcs_sources_download_through_adapter(monkeypatch, tmp_path):
+    downloads = []
+    metrics = []
+    adapter = SimpleNamespace(
+        download=lambda uri, destination: downloads.append((uri, destination)),
+        emit_metric=lambda name, value: metrics.append((name, value)),
+    )
+    result = SimpleNamespace(
+        feature="temp_c",
+        psi=0.1,
+        ks_statistic=0.05,
+        verdict="moderate",
+        ref_mean=79.5,
+        cur_mean=80.0,
+    )
+    monkeypatch.setattr(drift_alert.pd, "read_csv", lambda _: object())
+    monkeypatch.setattr(drift_alert, "compare", lambda *_: [result])
+    monkeypatch.setattr("cloudlayer.factory.get_adapter", lambda config: adapter)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "drift_alert.py",
+            "--reference-gcs-uri",
+            "bucket://reference.csv",
+            "--current-gcs-uri",
+            "bucket://current.csv",
+            "--out",
+            str(tmp_path / "alert.json"),
+            "--emit",
+        ],
+    )
+
+    assert drift_alert.main() == 0
+    assert [uri for uri, _ in downloads] == [
+        "bucket://reference.csv",
+        "bucket://current.csv",
+    ]
+    assert len(metrics) == 1
+
+
+def test_synthetic_drift_mode_shifts_reference_and_sends_email(monkeypatch, tmp_path):
+    baseline = drift_alert.pd.DataFrame({"temp_c": [70.0, 80.0]})
+    downloads = []
+    adapter = SimpleNamespace(
+        download=lambda uri, destination: downloads.append(uri),
+        emit_metric=lambda name, value: None,
+    )
+    result = SimpleNamespace(
+        feature="temp_c",
+        psi=0.4,
+        ks_statistic=0.3,
+        verdict="significant",
+        ref_mean=75.0,
+        cur_mean=81.0,
+    )
+    monkeypatch.setattr(drift_alert.pd, "read_csv", lambda _: baseline.copy())
+
+    def compare(reference, current, features):
+        assert current["temp_c"].tolist() == [76.0, 86.0]
+        return [result]
+
+    monkeypatch.setattr(drift_alert, "compare", compare)
+    monkeypatch.setattr("cloudlayer.factory.get_adapter", lambda config: adapter)
+    monkeypatch.setattr(drift_alert, "_email_settings", lambda: {"host": "smtp"})
+    emails = []
+    monkeypatch.setattr(
+        drift_alert,
+        "_send_email",
+        lambda message, **settings: emails.append(message) or True,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "drift_alert.py",
+            "--reference-gcs-uri",
+            "bucket://reference.csv",
+            "--test-synthetic-drift",
+            "--emit",
+            "--out",
+            str(tmp_path / "alert.json"),
+        ],
+    )
+
+    assert drift_alert.main() == 0
+    assert downloads == ["bucket://reference.csv"]
+    assert "temp_c PSI=0.400" in emails[0]

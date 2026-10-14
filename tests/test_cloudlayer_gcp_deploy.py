@@ -130,3 +130,27 @@ def test_set_traffic_split_updates_only_known_deployed_models(monkeypatch):
         "candidate": 0,
     }
     assert [call[0] for call in calls] == ["GET", "PATCH", "GET"]
+
+
+def test_emit_metric_writes_a_gauge_sample(monkeypatch):
+    adapter = GcpAdapter(config.load(strict=False))
+    recorded = {}
+
+    class Session:
+        def __init__(self, credentials):
+            recorded["credentials"] = credentials
+
+        def post(self, url, *, json, timeout):
+            recorded.update(url=url, body=json, timeout=timeout)
+            return SimpleNamespace(ok=True)
+
+    monkeypatch.setattr("google.auth.default", lambda scopes: (object(), None))
+    monkeypatch.setattr("google.auth.transport.requests.AuthorizedSession", Session)
+
+    adapter.emit_metric("drift.psi.temp_c", 0.4)
+
+    time_series = recorded["body"]["timeSeries"][0]
+    assert recorded["url"].endswith(f"/projects/{adapter.cfg.project_id}/timeSeries")
+    assert time_series["metric"]["type"].endswith("/drift.psi.temp_c")
+    assert time_series["metricKind"] == "GAUGE"
+    assert time_series["points"][0]["value"]["doubleValue"] == 0.4

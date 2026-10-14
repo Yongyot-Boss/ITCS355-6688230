@@ -1,5 +1,6 @@
 # NEVER commit this. Real credentials and account identifiers live here.
 cloud.env
+monitoring/gcp/deploy.env
 
 # DVC manages these; Git must not.
 data/raw/

@@ -13,6 +13,7 @@ import os
 import smtplib
 import ssl
 import sys
+import tempfile
 from email.message import EmailMessage
 from pathlib import Path
 
@@ -84,48 +85,97 @@ def _email_settings() -> dict[str, str | int]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--reference", type=Path, default=Path("data/raw/sensors.csv"))
-    ap.add_argument("--current", type=Path, required=True)
+    ap.add_argument("--reference-gcs-uri")
+    ap.add_argument("--current", type=Path)
+    ap.add_argument("--current-gcs-uri")
+    ap.add_argument(
+        "--test-synthetic-drift",
+        action="store_true",
+        help="shift temp_c in a copy of the reference data to exercise the alert path",
+    )
     ap.add_argument("--threshold", type=float, default=0.25)
     ap.add_argument("--out", type=Path, default=Path("reports/drift_alert.json"))
+    ap.add_argument("--emit", action="store_true", help="write each feature's PSI as a metric")
     args = ap.parse_args()
 
-    ref = pd.read_csv(args.reference)
-    cur = pd.read_csv(args.current)
-    results = compare(ref, cur, data.FEATURES)
-    worst = max(results, key=lambda r: r.psi, default=None)
-    max_psi = worst.psi if worst else 0.0
+    if args.test_synthetic_drift and (args.current or args.current_gcs_uri):
+        ap.error("--test-synthetic-drift cannot be combined with a current data source")
+    if not args.test_synthetic_drift and bool(args.current) == bool(args.current_gcs_uri):
+        ap.error("provide exactly one of --current or --current-gcs-uri")
+    if args.reference_gcs_uri and args.reference != Path("data/raw/sensors.csv"):
+        ap.error("provide only one reference source: --reference or --reference-gcs-uri")
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "threshold": args.threshold,
-        "max_psi": max_psi,
-        "worst_feature": worst.feature if worst else None,
-        "results": [
-            {
-                "feature": r.feature,
-                "psi": r.psi,
-                "ks_statistic": r.ks_statistic,
-                "verdict": r.verdict,
-                "ref_mean": r.ref_mean,
-                "cur_mean": r.cur_mean,
-            }
-            for r in results
-        ],
-    }
-    args.out.write_text(json.dumps(payload, indent=2))
+    adapter = None
+    if args.reference_gcs_uri or args.current_gcs_uri or args.emit:
+        from cloudlayer.factory import get_adapter
+        from src import config
 
-    if max_psi >= args.threshold:
-        message = (
-            f"Drift alert: {worst.feature} PSI={max_psi:.3f} exceeds the {args.threshold:.2f} threshold. "
-            f"Review the upstream stream before retraining."
-        )
-        settings = _email_settings()
-        sent = _send_email(message, **settings)
-        print(f"ALERT: {message}")
-        return 0 if sent else 1
+        adapter = get_adapter(config.load(strict=False))
 
-    print(f"No drift alert. Max PSI={max_psi:.3f} below threshold {args.threshold:.2f}.")
-    return 0
+    with tempfile.TemporaryDirectory(prefix="drift-alert-") as temp_dir:
+        reference_path = args.reference
+        current_path = args.current
+        if args.reference_gcs_uri:
+            assert adapter is not None
+            reference_path = Path(temp_dir) / "reference.csv"
+            adapter.download(args.reference_gcs_uri, str(reference_path))
+        if args.current_gcs_uri:
+            assert adapter is not None
+            current_path = Path(temp_dir) / "current.csv"
+            adapter.download(args.current_gcs_uri, str(current_path))
+
+        ref = pd.read_csv(reference_path)
+        if args.test_synthetic_drift:
+            cur = ref.copy()
+            cur["temp_c"] = cur["temp_c"] + 6.0
+            print("TEST MODE: shifted temp_c by +6.0 from the reference data.")
+        else:
+            assert current_path is not None
+            cur = pd.read_csv(current_path)
+        results = compare(ref, cur, data.FEATURES)
+
+        if args.emit:
+            assert adapter is not None
+            for result in results:
+                adapter.emit_metric(f"drift.psi.{result.feature}", result.psi)
+
+        worst = max(results, key=lambda r: r.psi, default=None)
+        max_psi = worst.psi if worst else 0.0
+        payload = {
+            "threshold": args.threshold,
+            "max_psi": max_psi,
+            "worst_feature": worst.feature if worst else None,
+            "results": [
+                {
+                    "feature": r.feature,
+                    "psi": r.psi,
+                    "ks_statistic": r.ks_statistic,
+                    "verdict": r.verdict,
+                    "ref_mean": r.ref_mean,
+                    "cur_mean": r.cur_mean,
+                }
+                for r in results
+            ],
+        }
+
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(payload, indent=2))
+
+        if max_psi >= args.threshold:
+            message = (
+                f"Drift alert: {worst.feature} PSI={max_psi:.3f} exceeds the {args.threshold:.2f} threshold. "
+                f"Review the upstream stream before retraining."
+            )
+            settings = _email_settings()
+            sent = _send_email(message, **settings)
+            print(f"ALERT: {message}")
+            if not sent:
+                return 1
+            print("Drift threshold breached and email notification delivered.")
+            return 0
+
+        print(f"No drift alert. Max PSI={max_psi:.3f} below threshold {args.threshold:.2f}.")
+        return 0
 
 
 if __name__ == "__main__":

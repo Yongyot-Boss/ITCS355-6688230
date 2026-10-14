@@ -1,0 +1,116 @@
+{
+  "displayName": "ITCS355 Feature drift",
+  "gridLayout": {
+    "columns": 2,
+    "widgets": [
+      {
+        "title": "PSI: temp_c",
+        "xyChart": {
+          "dataSets": [{
+            "plotType": "LINE",
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type = \"custom.googleapis.com/drift.psi.temp_c\" AND resource.type = \"global\"",
+                "aggregation": {
+                  "alignmentPeriod": "21600s",
+                  "perSeriesAligner": "ALIGN_MAX"
+                }
+              }
+            }
+          }],
+          "yAxis": {"label": "PSI", "scale": "LINEAR"}
+        }
+      },
+      {
+        "title": "PSI: vibration_mm_s",
+        "xyChart": {
+          "dataSets": [{
+            "plotType": "LINE",
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type = \"custom.googleapis.com/drift.psi.vibration_mm_s\" AND resource.type = \"global\"",
+                "aggregation": {
+                  "alignmentPeriod": "21600s",
+                  "perSeriesAligner": "ALIGN_MAX"
+                }
+              }
+            }
+          }],
+          "yAxis": {"label": "PSI", "scale": "LINEAR"}
+        }
+      },
+      {
+        "title": "PSI: pressure_kpa",
+        "xyChart": {
+          "dataSets": [{
+            "plotType": "LINE",
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type = \"custom.googleapis.com/drift.psi.pressure_kpa\" AND resource.type = \"global\"",
+                "aggregation": {
+                  "alignmentPeriod": "21600s",
+                  "perSeriesAligner": "ALIGN_MAX"
+                }
+              }
+            }
+          }],
+          "yAxis": {"label": "PSI", "scale": "LINEAR"}
+        }
+      },
+      {
+        "title": "PSI: hours_since_service",
+        "xyChart": {
+          "dataSets": [{
+            "plotType": "LINE",
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type = \"custom.googleapis.com/drift.psi.hours_since_service\" AND resource.type = \"global\"",
+                "aggregation": {
+                  "alignmentPeriod": "21600s",
+                  "perSeriesAligner": "ALIGN_MAX"
+                }
+              }
+            }
+          }],
+          "yAxis": {"label": "PSI", "scale": "LINEAR"}
+        }
+      },
+      {
+        "title": "PSI: load_pct",
+        "xyChart": {
+          "dataSets": [{
+            "plotType": "LINE",
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type = \"custom.googleapis.com/drift.psi.load_pct\" AND resource.type = \"global\"",
+                "aggregation": {
+                  "alignmentPeriod": "21600s",
+                  "perSeriesAligner": "ALIGN_MAX"
+                }
+              }
+            }
+          }],
+          "yAxis": {"label": "PSI", "scale": "LINEAR"}
+        }
+      },
+      {
+        "title": "PSI: ambient_humidity",
+        "xyChart": {
+          "dataSets": [{
+            "plotType": "LINE",
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type = \"custom.googleapis.com/drift.psi.ambient_humidity\" AND resource.type = \"global\"",
+                "aggregation": {
+                  "alignmentPeriod": "21600s",
+                  "perSeriesAligner": "ALIGN_MAX"
+                }
+              }
+            }
+          }],
+          "yAxis": {"label": "PSI", "scale": "LINEAR"}
+        }
+      }
+    ]
+  }
+}

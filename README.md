@@ -89,25 +89,20 @@ investigating the incident instead of pushing through degraded service.
 
 ### Drift alerting and scheduled monitoring
 
-Task 5 is implemented as a scheduled drift check in [`.github/workflows/drift-alert.yml`](.github/workflows/drift-alert.yml)
-and an alert script in [`monitoring/drift_alert.py`](monitoring/drift_alert.py). Every six hours,
-the job downloads the latest production input CSV from the `DRIFT_CURRENT_URL` repository secret,
-compares it with the training reference window, emits PSI metrics, and preserves the report and
-telemetry as a workflow artifact. It sends an email when any feature reaches PSI 0.25. A PSI below
-0.10 is ordinary sensor noise, 0.10-0.25 merits review, and 0.25+ is a material fleet-level shift
-that can bias the model.
+Task 5 uses Google Cloud Scheduler to start a Cloud Run Job every six hours. The job reads its
+training reference and latest production-input CSV directly from a private GCS bucket using its
+service identity, writes PSI gauges to Cloud Monitoring, and sends an email via SMTP when a
+feature reaches PSI 0.25. Deployment files and setup steps are in
+[`monitoring/gcp/README.md`](monitoring/gcp/README.md). A PSI below 0.10 is ordinary sensor noise,
+0.10-0.25 merits review, and 0.25+ is a material fleet-level shift that can bias the model.
 
-Configure these GitHub repository settings before enabling the schedule:
-
-- Secret `DRIFT_CURRENT_URL`: protected HTTPS URL serving the latest production input CSV (features
-  only is sufficient; it must use the columns in `src/data.py`).
-- Variables `SMTP_HOST`, `SMTP_PORT` (normally `587`), `DRIFT_EMAIL_FROM`, and `DRIFT_EMAIL_TO`.
-- Secrets `SMTP_USERNAME` and `SMTP_PASSWORD`.
-
-`DRIFT_EMAIL_TO` should be the team's monitored on-call mailbox or paging-enabled distribution
-list; the person/group responsible for that mailbox will see overnight alerts. SMTP uses STARTTLS.
-If the drift threshold is breached but the snapshot or mail configuration is unavailable, the
-workflow fails visibly rather than reporting successful delivery.
+Set the deployment's `email_to` to a mailbox or paging-enabled distribution list monitored by the
+on-call team; SMTP credentials are read from Secret Manager, not GitHub Actions or committed files.
+Use Cloud Scheduler's **Run now** action for a one-time schedule trigger test. A successful trigger
+starts the job; inspect the Cloud Run Job execution logs and the destination inbox to verify
+completion and delivery. For a safe synthetic-drift email test without changing the production
+snapshot, execute the Cloud Run Job once with argument overrides as documented in
+[`monitoring/gcp/README.md`](monitoring/gcp/README.md).
 
 ---
 
