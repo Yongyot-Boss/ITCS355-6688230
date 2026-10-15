@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -48,7 +48,7 @@ def main() -> int:
     before = adapter.endpoint_traffic(args.endpoint)
     after = adapter.set_traffic_split(args.endpoint, args.split)
     evidence = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "endpoint": args.endpoint,
         "before": before,
         "requested": args.split,

@@ -7,7 +7,7 @@ import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -44,7 +44,7 @@ def main() -> int:
         probabilities = list(pool.map(predict, bodies))
     elapsed = time.perf_counter() - started
     result = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "rows": len(labels),
         "duration_seconds": round(elapsed, 3),
         "roc_auc": round(float(roc_auc_score(labels, probabilities)), 6),

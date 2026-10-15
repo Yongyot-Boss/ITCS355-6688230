@@ -14,7 +14,7 @@ import os
 import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -46,7 +46,7 @@ def _log_event(event: str, **fields: Any) -> None:
         "%s",
         json.dumps(
             {
-                "ts": datetime.now(timezone.utc).isoformat(),
+                "ts": datetime.now(UTC).isoformat(),
                 "level": "INFO",
                 "event": event,
                 **fields,
@@ -103,7 +103,7 @@ async def lifespan(app: FastAPI):
             "%s",
             json.dumps(
                 {
-                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "ts": datetime.now(UTC).isoformat(),
                     "level": "ERROR",
                     "event": "model_load_failed",
                     "error": str(exc),

@@ -25,7 +25,7 @@ def main() -> int:
 
     try:
         cfg = config.load(strict=False)
-    except Exception as exc:  # pragma: no cover - defensive guard for missing cloud.env
+    except (RuntimeError, OSError, ValueError, TypeError) as exc:
         print(f"No cloud configuration loaded; skipping teardown verification: {exc}")
         return 0
 
@@ -37,14 +37,11 @@ def main() -> int:
     tags = cfg.tags(args.lab)
     try:
         adapter = get_adapter(cfg)
-    except (ModuleNotFoundError, ImportError) as exc:
+    except (ModuleNotFoundError, ImportError, RuntimeError, ValueError, AttributeError) as exc:
         print(
             f"Cloud SDK dependencies are missing for {cfg.provider}; "
             f"skipping live teardown verification: {exc}"
         )
-        return 0
-    except Exception as exc:  # pragma: no cover - provider adapter may fail before auth happens
-        print(f"Unable to initialize the cloud adapter for teardown verification: {exc}")
         return 0
 
     print(f"searching for resources tagged {tags}")
