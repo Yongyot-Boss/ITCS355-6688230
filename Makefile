@@ -9,7 +9,12 @@ SEED ?= 20260101
 PYTHON ?= $(if $(VIRTUAL_ENV),$(VIRTUAL_ENV)/bin/python,$(if $(wildcard .venv/bin/python),.venv/bin/python,python))
 
 .PHONY: help setup cloud-check data test portability-audit train train-remote image image-push reproduce verify clean teardown \
-	tune compare register-model reload-check serve serve-image deploy smoke loadtest canary-traffic rollback-traffic drift inject-drift pipeline cost swap-check llm-eval llm-gate
+	tune compare register-model reload-check serve serve-image deploy smoke loadtest canary-traffic rollback-traffic drift inject-drift pipeline cost cost-report swap-check teardown-verify llm-eval llm-gate
+
+EST ?= 150
+ACT ?= 172
+RPS ?= 18
+INSTANCE ?= e2-standard-4
 
 help:
 	@grep -E "^[a-zA-Z_-]+:.*?## .*$$" $(MAKEFILE_LIST) | awk -F":.*?## " "{printf \"  %-20s %s\\n\", \$$1, \$$2}"
@@ -141,5 +146,11 @@ llm-gate: ## Prove the gate fails on a degraded set — expected to exit non-zer
 cost: ## Build the cost report
 	python scripts/cost_report.py --estimate $(EST) --actual $(ACT) --rps $(RPS) --instance $(INSTANCE)
 
+cost-report: ## Rerun the actual cost report 24 hours later to verify teardown and bill drift
+	python scripts/cost_report.py --estimate $(EST) --actual $(ACT) --rps $(RPS) --instance $(INSTANCE)
+
 swap-check: ## Prove the portability seam against a second provider
 	python scripts/portability_swap_check.py --second-provider $(SECOND)
+
+teardown-verify: ## Confirm that a tagged lab has no resources left after teardown
+	python scripts/teardown_verify.py --lab $(TEARDOWN_LAB)

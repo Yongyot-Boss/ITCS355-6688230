@@ -6,7 +6,7 @@
 # a container rather than a function.
 
 name: itcs355-training-pipeline
-schedule: "0 2 * * 0"          # TODO(Lab 5): justify this in your README, or change it
+schedule: "0 2 * * 0"          # Weekly safety-net retrain; drift-triggered runs can fire sooner.
 
 steps:
   - name: ingest

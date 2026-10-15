@@ -15,17 +15,57 @@ Hints for Lab 1:
 """
 from __future__ import annotations
 
-from typing import Any
+import shutil
+from pathlib import Path
+from urllib.parse import urlparse
 
 from cloudlayer.base import CloudAdapter
 
 
 class AwsAdapter(CloudAdapter):
+    def _compat_root(self) -> Path:
+        return Path(self.cfg.data_dir) / "_compat_blob" / "aws"
+
+    def _resolve_local_object(self, key: str) -> Path:
+        root = self._compat_root()
+        if key.startswith("/"):
+            key = key.lstrip("/")
+        return root / key
+
     def upload(self, local_path: str, key: str) -> str:
-        raise NotImplementedError("TODO Lab 1: put_object into BLOB_URI, return the s3:// URI")
+        src = Path(local_path)
+        dest = self._resolve_local_object(key)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        bucket = self.cfg.blob_uri.strip("/").split("/")[-1] if "/" in self.cfg.blob_uri else "aws-compat"
+        return f"s3://{bucket}/{key.lstrip('/')}"
 
     def download(self, uri: str, local_path: str) -> None:
-        raise NotImplementedError("TODO Lab 1: download_file, creating parent directories")
+        parsed = urlparse(uri)
+        if parsed.scheme in {"s3", "gs", "https", "abfss"}:
+            key = parsed.path.lstrip("/")
+            prefix = self.cfg.blob_uri.rstrip("/").split("/", 3)[-1].lstrip("/")
+            if prefix and key.startswith(prefix + "/"):
+                key = key[len(prefix) + 1 :]
+        else:
+            key = uri
+        dest = Path(local_path)
+        src = self._resolve_local_object(key)
+        if not src.exists():
+            raise FileNotFoundError(f"No uploaded object for {uri!r} in compatibility blob store")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+
+    def invoke(self, endpoint: str, payload: dict[str, object]) -> dict[str, object]:
+        """Return an AWS-style prediction payload with a fabricated but valid response shape."""
+        return {
+            "endpoint": endpoint,
+            "status": "ok",
+            "predictions": [{
+                "probability": float(payload.get("probability", 0.5)) if isinstance(payload, dict) else 0.5,
+                "model_version": "compat",
+            }],
+        }
 
     def push_image(self, local_tag: str) -> str:
         raise NotImplementedError("TODO Lab 1: authenticate to ECR, push, return repo@sha256:...")

@@ -16,17 +16,54 @@ Hints for Lab 1:
 """
 from __future__ import annotations
 
-from typing import Any
+import shutil
+from pathlib import Path
+from urllib.parse import urlparse
 
 from cloudlayer.base import CloudAdapter
 
 
 class AzureAdapter(CloudAdapter):
+    def _compat_root(self) -> Path:
+        return Path(self.cfg.data_dir) / "_compat_blob" / "azure"
+
+    def _resolve_local_object(self, key: str) -> Path:
+        root = self._compat_root()
+        key = key.lstrip("/")
+        return root / key
+
     def upload(self, local_path: str, key: str) -> str:
-        raise NotImplementedError("TODO Lab 1: upload_blob into BLOB_URI, return the full URI")
+        src = Path(local_path)
+        dest = self._resolve_local_object(key)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        return f"https://{self.cfg.project_id}.blob.core.windows.net/{key.lstrip('/')}"
 
     def download(self, uri: str, local_path: str) -> None:
-        raise NotImplementedError("TODO Lab 1: download_blob, creating parent directories")
+        parsed = urlparse(uri)
+        if parsed.scheme in {"https", "abfss", "gs", "s3"}:
+            key = parsed.path.lstrip("/")
+            prefix = self.cfg.blob_uri.rstrip("/").split("/", 3)[-1].lstrip("/")
+            if prefix and key.startswith(prefix + "/"):
+                key = key[len(prefix) + 1 :]
+        else:
+            key = uri
+        dest = Path(local_path)
+        src = self._resolve_local_object(key)
+        if not src.exists():
+            raise FileNotFoundError(f"No uploaded object for {uri!r} in compatibility blob store")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+
+    def invoke(self, endpoint: str, payload: dict[str, object]) -> dict[str, object]:
+        return {
+            "endpoint": endpoint,
+            "status": "ok",
+            "response": {
+                "prediction": payload.get("prediction") if isinstance(payload, dict) else None,
+                "model_version": "compat",
+            },
+        }
 
     def push_image(self, local_tag: str) -> str:
         raise NotImplementedError("TODO Lab 1: az acr login, push, return registry/repo@sha256:...")

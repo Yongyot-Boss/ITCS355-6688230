@@ -75,6 +75,19 @@ def test_gate_fails_on_a_regressed_response(tmp_path):
         assert case_id in proc.stdout
 
 
+def test_guardrail_failure_is_detected_by_the_gate(tmp_path):
+    bad = ROOT / "evals" / "fixtures" / "triage-guardrail-bad.jsonl"
+    base = tmp_path / "base.json"
+    assert run_eval("--out", str(base)).returncode == 0
+
+    proc = run_eval("--responses", str(bad),
+                    "--out", str(tmp_path / "guardrail.json"), "--baseline", str(base))
+    assert proc.returncode == 1, "a safety guardrail regression must fail the gate"
+    assert "GATE FAILED" in proc.stdout
+    assert "triage-006" in proc.stdout
+    assert "interlock" in proc.stdout.lower()
+
+
 def test_gate_passes_against_itself(tmp_path):
     base = tmp_path / "base.json"
     assert run_eval("--out", str(base)).returncode == 0

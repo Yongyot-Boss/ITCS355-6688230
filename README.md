@@ -154,6 +154,53 @@ registered model version and that a rollback candidate exists before assigning t
 
 ---
 
+## Scheduled retraining policy
+
+For this machine-failure prediction system, the right question is not "how often should we retrain in
+principle?" but "what signal tells us the existing model has become stale or misleading in a way that
+matters to deployment?" The answer is a hybrid: a weekly schedule is the safety net, and a drift-triggered
+retraining check is the operational trigger for real fleet changes.
+
+| Strategy | When it is right for this system | How it fails here |
+|---|---|---|
+| Fixed schedule | Good as a backup control. A weekly run guarantees we revisit the model even if no one notices drift or new data. | It retrains on time even when nothing has changed, which wastes compute and can create unnecessary churn. It also misses sudden distribution shifts that appear between scheduled runs. |
+| Data volume threshold | Reasonable only when new data arrives in predictable batches and data quality is trusted. | This problem is not dominated by raw volume. The important signal is change in sensor distribution, not whether we reached 100 more rows. A volume threshold can retrain after a noisy but harmless batch and can also delay retraining while the fleet is already drifting. |
+| Drift-triggered | Best fit for a sensor fleet with stable semantics and known feature drift risk. We care about whether the production distribution shifts materially, not simply whether more rows arrived. | The failure mode is severe: if upstream telemetry is corrupted and the drift check reports a fake shift, retraining on poisoned data can destroy a working model faster than a fixed weekly schedule would. A drift-only policy without validation is therefore unsafe. |
+
+I chose a weekly scheduled pipeline with drift-triggered retraining as the operational trigger. In plain terms:
+
+- the weekly run is the safety net and audit trail;
+- the drift check can trigger an earlier retrain when the feature distribution moves materially;
+- the model still does not register unless the evaluation gate passes and the data contract tests pass.
+
+The worst case is a corrupted upstream sensor feed: a broken gateway or unit conversion bug can make the
+feature distribution appear to drift even though the underlying business signal is still valid. In that case,
+a drift-only policy would retrain on bad data and could degrade a healthy model faster than a fixed schedule
+would. This is exactly why the pipeline must validate data before training and still require a real gate before
+registering or deploying.
+
+---
+
+## Portability seam write-up
+
+The hardest method to port was `invoke`, because the cloud providers expose almost the same operational idea
+(prediction request + response payload) but with different route names, authentication paths, and response
+wrappers. A file upload or download is straightforward to map by object URI, but invoking a serving endpoint
+always leaks a bit of provider-specific semantics through the seam. The most obvious leak was the prediction
+payload itself: the service response is not a neutral JSON document across providers, because the endpoint
+wrapping, metadata fields, and inference route conventions differ enough that the adapter must translate them.
+
+A full migration would cost real engineering time — roughly one to two engineer-weeks for the adapter layer,
+plus another week for environment, identity, and deployment verification, and a final pass for performance and
+cost tuning. That is not a huge amount, but it is not free either. In this case, the abstraction was useful for
+keeping the data path and model-serving interfaces out of application code, especially for the pipeline and
+model-management logic. But it was not magic: the provider-specific response shape and deployment model still
+leak, which is why I would treat the adapter as a disciplined seam rather than a promise of full portability.
+Honest verdict: the abstraction was worth it for the training and data path, but I would not pretend it removes
+all platform-specific operational work.
+
+---
+
 ## Checklist before you submit
 
 - [ ] `make reproduce` works from a fresh clone, on a machine that is not yours

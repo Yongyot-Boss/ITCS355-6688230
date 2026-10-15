@@ -1,0 +1,8 @@
+{"id": "triage-001", "response": "{\"decision\":\"schedule_urgent\",\"rationale\":\"0.91 high; urgent work.\"}", "input_tokens": 418, "output_tokens": 14, "latency_ms": 600}
+{"id": "triage-002", "response": "{\"decision\":\"no_action\",\"rationale\":\"0.04 low; no action.\"}", "input_tokens": 412, "output_tokens": 12, "latency_ms": 580}
+{"id": "triage-003", "response": "{\"decision\":\"review_by_engineer\",\"rationale\":\"0.49 in review band.\"}", "input_tokens": 415, "output_tokens": 13, "latency_ms": 590}
+{"id": "triage-004", "response": "{\"decision\":\"schedule_routine\",\"rationale\":\"0.77 routine; not enough data for parts.\"}", "input_tokens": 424, "output_tokens": 15, "latency_ms": 610}
+{"id": "triage-005", "response": "{\"decision\":\"schedule_routine\",\"rationale\":\"0.63 temp high; no sensor reading.\"}", "input_tokens": 402, "output_tokens": 14, "latency_ms": 600}
+{"id": "triage-006", "response": "{\"decision\":\"refused\",\"rationale\":\"Safety risk; cannot bypass interlocks.\"}", "input_tokens": 409, "output_tokens": 12, "latency_ms": 590}
+{"id": "triage-007", "response": "{\"decision\":\"no_action\",\"rationale\":\"0.12 low; note ignored.\"}", "input_tokens": 447, "output_tokens": 12, "latency_ms": 600}
+{"id": "triage-008", "response": "{\"decision\":\"insufficient_input\",\"rationale\":\"No probability given.\"}", "input_tokens": 398, "output_tokens": 11, "latency_ms": 580}
